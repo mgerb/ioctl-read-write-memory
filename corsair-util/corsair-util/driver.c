@@ -34,7 +34,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistrtyPat
 {
 	UNREFERENCED_PARAMETER(pRegistrtyPath);
 	pDriverObject->DriverUnload = UnloadDriver;
-	DebugMessage("driver entry");
+	DebugMessage("Corsair Utility Driver Entry");
 
 	PsSetLoadImageNotifyRoutine(ImageLoadCallback);
 
@@ -57,7 +57,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistrtyPat
 NTSTATUS UnloadDriver(PDRIVER_OBJECT pDriverObject)
 {
 	UNREFERENCED_PARAMETER(pDriverObject);
-	DebugMessage("driver unloaded");
+	DebugMessage("Corsair Utility Driver Unloaded");
 
 	PsRemoveLoadImageNotifyRoutine(ImageLoadCallback);
 
@@ -73,12 +73,12 @@ PLOAD_IMAGE_NOTIFY_ROUTINE ImageLoadCallback(PUNICODE_STRING fullImageName, HAND
 	{
 		DebugMessage("executable found: %p \n", client_path);
 		ClientDLLAddress = imageInfo->ImageBase;
+		ClientProcessId = processId;
 		DebugMessage("process id: %d \n", processId);
 	}
 
 	return STATUS_SUCCESS;
 }
-
 
 NTSTATUS CreateCall(PDEVICE_OBJECT deviceObject, PIRP irp)
 {
@@ -87,7 +87,7 @@ NTSTATUS CreateCall(PDEVICE_OBJECT deviceObject, PIRP irp)
 
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DebugMessage("CreateCall was called, connection established!\n");
+	DebugMessage("CreateCall\n");
 
 	return STATUS_SUCCESS;
 }
@@ -99,7 +99,7 @@ NTSTATUS CloseCall(PDEVICE_OBJECT deviceObject, PIRP irp)
 
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DebugMessage("CloseCall was called, connection terminated!\n");
+	DebugMessage("CloseCall\n");
 
 	return STATUS_SUCCESS;
 }
@@ -116,26 +116,29 @@ NTSTATUS IoControl(PDEVICE_OBJECT deviceObject, PIRP irp)
 	if (controlCode == IO_GET_CLIENT_ADDRESS) {
 		PULONG output = (PULONG)irp->AssociatedIrp.SystemBuffer;
 		*output = ClientDLLAddress;
-
-		DebugMessage("client address requested\n");
-
 		status = STATUS_SUCCESS;
 		byteIO = sizeof(*output);
 	} else if (controlCode == IO_READ_REQUEST) {
-		PKERNEL_READ_REQUEST readInput = (PKERNEL_READ_REQUEST) irp->AssociatedIrp.SystemBuffer;
+		KERNEL_REQUEST * readInput = (KERNEL_REQUEST*) irp->AssociatedIrp.SystemBuffer;
 		PEPROCESS process;
-		if (NT_SUCCESS(PsLookupProcessByProcessId(readInput->processId, &process))) {
+		if (NT_SUCCESS(PsLookupProcessByProcessId(ClientProcessId, &process))) {
+			DebugMessage("Reading memory address: %lu", readInput->address);
+			DebugMessage("Reading memory pBuff: %lu", readInput->pBuff);
+			DebugMessage("Reading memory size: %lu", readInput->size);
 			KernelReadVirtualMemory(process, readInput->address, readInput->pBuff, readInput->size);
 			status = STATUS_SUCCESS;
-			byteIO = sizeof(KERNEL_READ_REQUEST);
+			byteIO = sizeof(KERNEL_REQUEST);
 		}
 	} else if (controlCode == IO_WRITE_REQUEST) {
-		PKERNEL_WRITE_REQUEST writeInput = (PKERNEL_WRITE_REQUEST) irp->AssociatedIrp.SystemBuffer;
+		KERNEL_REQUEST * writeInput = (KERNEL_REQUEST*) irp->AssociatedIrp.SystemBuffer;
 		PEPROCESS process;
-		if (NT_SUCCESS(PsLookupProcessByProcessId(writeInput->processId, &process))) {
-			KernelReadVirtualMemory(process, writeInput->address, writeInput->pBuff, writeInput->size);
+		if (NT_SUCCESS(PsLookupProcessByProcessId(ClientProcessId, &process))) {
+			DebugMessage("Writing memory address: %lu", writeInput->address);
+			DebugMessage("Writing memory pBuff: %lu", writeInput->pBuff);
+			DebugMessage("Writing memory size: %lu", writeInput->size);
+			KernelWriteVirtualMemory(process, writeInput->pBuff, writeInput->address, writeInput->size);
 			status = STATUS_SUCCESS;
-			byteIO = sizeof(KERNEL_READ_REQUEST);
+			byteIO = sizeof(KERNEL_REQUEST);
 		}
 	} else {
 		byteIO = 0;

@@ -12,6 +12,7 @@ PLOAD_IMAGE_NOTIFY_ROUTINE ImageLoadCallback(PUNICODE_STRING fullImageName, HAND
 
 // data
 ULONG ClientDLLAddress;
+ULONG ClientProcessId;
 PDEVICE_OBJECT pDeviceObject;
 UNICODE_STRING dev, dos;
 
@@ -23,19 +24,11 @@ NTSTATUS CreateCall(PDEVICE_OBJECT deviceObject, PIRP irp);
 NTSTATUS CloseCall(PDEVICE_OBJECT deviceObject, PIRP irp);
 NTSTATUS IoControl(PDEVICE_OBJECT deviceObject, PIRP irp);
 
-typedef struct _KERNEL_READ_REQUEST {
-	ULONG processId;
+typedef struct _KERNEL_REQUEST {
 	ULONG address;
-	PVOID pBuff;
+	void * pBuff;
 	ULONG size;
-} KERNEL_READ_REQUEST, * PKERNEL_READ_REQUEST;
-
-typedef struct _KERNEL_WRITE_REQUEST {
-	ULONG processId;
-	ULONG address;
-	PVOID pBuff;
-	ULONG size;
-} KERNEL_WRITE_REQUEST, * PKERNEL_WRITE_REQUEST;
+} KERNEL_REQUEST;
 
 // memory
 NTSTATUS NTAPI MmCopyVirtualMemory
